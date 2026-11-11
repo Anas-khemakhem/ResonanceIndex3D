@@ -62,7 +62,7 @@ The repository includes a lightweight **Flask + Three.js** visualizer that rende
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com
+git clone [https://github.com](https://github.com/Anas-khemakhem/ResonanceIndex3D)
 cd ResonanceIndex3D
 
 # 2. Install minimal dependencies (Flask, NumPy, NetworkX)

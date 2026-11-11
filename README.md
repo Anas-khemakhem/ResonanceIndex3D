@@ -27,27 +27,35 @@ When running local LLMs (e.g., Qwen, DeepSeek via Ollama) and computer vision pi
 
 ---
 
+
 ## Mathematical Formulation
 
-1. **Feature Encoding & Neighborhood Superposition (Startup):**Each node $i$ is represented as a sparse TF-IDF weighted atom vector $\mathbf{v}_i$. To encode graph topology without runtime traversal, each node state $|\Psi_i\rangle$ is constructed as a normalized superposition of its own features and its direct neighbors $\mathcal{N}(i)$:
-   $$
-   |\Psi_i\rangle =
-   \frac{
-   \mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)}
-   \mathbf{v}_j^{(\text{tokens})}
-   }{
-   \left\|
-   \mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)}
-   \mathbf{v}_j^{(\text{tokens})}
-   \right\|_2
-   }
-   $$
-2. **Born-Rule Relevance Scoring (Query Time):**Given a normalized query wave $|q\rangle$, candidate postings are accumulated up to `MAX_POSTINGS` per atom, and nodes are ranked via squared amplitude overlap:
-   $$
-   P_i = \left|\langle q \mid \Psi_i \rangle\right|^2
-   $$
+### 1. Feature Encoding & Neighborhood Superposition (Startup)
 
----
+Each node $i$ is represented as a sparse TF-IDF weighted atom vector $\mathbf{v}_i$.
+
+To encode graph topology without runtime traversal, each node state $|\Psi_i\rangle$ is constructed as a normalized superposition of its own features and its direct neighbors $\mathcal{N}(i)$:
+
+$$
+|\Psi_i\rangle =
+\frac{
+\mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)}
+\mathbf{v}_j^{(\text{tokens})}
+}{
+\left\|
+\mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)}
+\mathbf{v}_j^{(\text{tokens})}
+\right\|_2
+}
+$$
+
+### 2. Born-Rule Relevance Scoring (Query Time)
+
+Given a normalized query wave $|q\rangle$, candidate postings are accumulated up to `MAX_POSTINGS` per atom, and nodes are ranked via squared amplitude overlap:
+
+$$
+P_i = \left|\langle q \mid \Psi_i \rangle\right|^2
+$$
 
 ## Benchmarks
 
@@ -61,7 +69,7 @@ Evaluated in isolated fresh processes on an **Intel i7-12th Gen U (CPU only, no 
 
 ### Honest Engineering Limitations
 
-- **Not**$\mathcal{O}(1)$**Asymptotic Space:** Index memory scales linearly at $\mathcal{O}(N)$ (\~0.4 KB/node). Only per-query compute is bounded via top-$K$ posting truncation (`MAX_POSTINGS`).
+- **Not****$\mathcal{O}(1)$****Asymptotic Space:** Index memory scales linearly at $\mathcal{O}(N)$ (\~0.4 KB/node). Only per-query compute is bounded via top-$K$ posting truncation (`MAX_POSTINGS`).
 - **Recall vs. Cap Trade-off:** On ultra-frequent atoms exceeding `MAX_POSTINGS = 256`, early termination trades a small fraction of recall (\~1–5%) for deterministic sub-millisecond latency.
 - **Not a Replacement for Full-Text Search Engines:** For pure keyword search over massive prose corpora without graph topology, established engines like **SQLite FTS5** or **Apache Lucene (Block-Max WAND)** remain superior.
 
@@ -75,7 +83,7 @@ bash
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com
+git clone https://github.com/Anas-khemakhem/ResonanceIndex3D
 cd ResonanceIndex3D
 
 # 2. Install minimal dependencies (Flask, NumPy, NetworkX)

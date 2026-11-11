@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis 3D Brain</title>
+<style>
+:root{--bg:#06080f;--panel:rgba(14,18,30,.92);--line:#222a40;--tx:#dfe6f5;--mu:#7d88a6;--ac:#4cc9f0}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:13px/1.45 system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden}
+canvas{display:block}
+#bar{position:fixed;top:14px;left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 28px));z-index:5}
+#q{width:100%;padding:11px 16px;border-radius:24px;border:1px solid var(--line);background:var(--panel);color:var(--tx);font-size:14px;outline:none}
+#q:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(76,201,240,.15)}
+#lat{position:absolute;right:14px;top:11px;color:var(--ac);font-variant-numeric:tabular-nums;font-size:12px;pointer-events:none}
+.panel{position:fixed;top:70px;bottom:14px;width:340px;max-width:calc(100% - 28px);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;z-index:4;transition:transform .25s,opacity .25s}
+#res{left:14px}#drawer{right:14px}
+.panel.off{opacity:0;pointer-events:none}
+#res.off{transform:translateX(-24px)}#drawer.off{transform:translateX(24px)}
+h2{margin:0 0 2px;font-size:15px}h3{margin:14px 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu)}
+.mu{color:var(--mu)}.x{float:right;cursor:pointer;color:var(--mu);font-size:18px;line-height:1}
+.m{border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin:8px 0;cursor:pointer}
+.m:hover{border-color:#3a4566}
+.m b{font-size:13px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.bar{height:3px;background:#1b2236;border-radius:2px;margin:6px 0 4px}.bar i{display:block;height:100%;border-radius:2px}
+.f{padding:6px 8px;margin:4px 0;border-radius:7px;background:#0e1424;cursor:pointer}
+.f:hover{background:#151d33}.f small{display:block;color:var(--mu);white-space:pre-wrap;word-break:break-word;margin-top:2px}
+.chip{display:inline-block;padding:2px 9px;margin:2px 4px 2px 0;border:1px solid var(--line);border-radius:12px;cursor:pointer;font-size:12px}
+.chip:hover{border-color:var(--ac)}
+button{width:100%;padding:9px;margin-top:10px;border:1px solid var(--ac);background:rgba(76,201,240,.1);color:var(--ac);border-radius:8px;cursor:pointer;font-size:13px}
+button:hover{background:rgba(76,201,240,.2)}
+.path{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#aab6d6;word-break:break-all}
+#view{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:min(640px,calc(100% - 28px));max-height:46vh;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;z-index:6;overflow:auto}
+#view pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-word;font:12px/1.5 ui-monospace,Consolas,monospace;color:#cdd6ee}
+#view.off{display:none}
+.lb{position:fixed;left:0;top:0;pointer-events:none;font-size:11px;color:#c4cde6;text-shadow:0 0 4px #000,0 0 8px #000;white-space:nowrap;transition:opacity .25s;z-index:2}
+#hud{position:fixed;left:14px;bottom:10px;color:var(--mu);font-size:11px;z-index:3}
+#leg{position:fixed;right:14px;bottom:10px;font-size:11px;color:var(--mu);z-index:3;text-align:right}
+</style>
+</head>
+<body>
+<div id="bar"><input id="q" placeholder="Search memory… (e.g. kinematics, yolo, plc)" autocomplete="off" spellcheck="false"><span id="lat"></span></div>
+<div id="res" class="panel off"></div>
+<div id="drawer" class="panel off"></div>
+<div id="view" class="off"></div>
+<div id="hud"></div><div id="leg"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const api=(u,o)=>fetch(u,o).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()});
+const post=(u,b)=>api(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})});
+
+let renderer,scene,camera,controls,group,N=[],byId={},linkLines,linkCol,links=[],colors={};
+let matches=null,selected=null,tween=null;
+const V=THREE.Vector3;
+
+function glowTex(){
+  const c=document.createElement("canvas");c.width=c.height=64;const g=c.getContext("2d");
+  const r=g.createRadialGradient(32,32,0,32,32,32);
+  r.addColorStop(0,"rgba(255,255,255,1)");r.addColorStop(.25,"rgba(255,255,255,.55)");r.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle=r;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);
+}
+
+function init(d){
+  colors=d.subjects;
+  renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:"low-power"});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+  renderer.setSize(innerWidth,innerHeight);document.body.prepend(renderer.domElement);
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x06080f);
+  camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,100);
+  camera.position.set(7,3.2,7);
+  controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;controls.dampingFactor=.07;controls.target.set(0,-.3,-.4);
+  controls.minDistance=3;controls.maxDistance=20;controls.autoRotate=true;controls.autoRotateSpeed=.35;
+  group=new THREE.Group();scene.add(group);
+
+  // decorative cortex shell: one cheap Points draw call
+  const sg=new THREE.BufferGeometry();
+  sg.setAttribute("position",new THREE.Float32BufferAttribute(d.shell,3));
+  group.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0x5a6b9a,size:.028,transparent:true,opacity:.38,depthWrite:false})));
+
+  const tex=glowTex();
+  d.nodes.forEach(n=>{
+    const col=new THREE.Color(colors[n.subject]||"#fff");
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,color:col,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    sp.position.set(n.x,n.y,n.z);group.add(sp);
+    const lb=document.createElement("div");lb.className="lb";lb.textContent=n.id.replace(/_/g," ");document.body.appendChild(lb);
+    const o={n,sp,lb,col,base:n.id==="Jarvis"?.9:.62,s:.62,sT:.62,a:1,aT:1,ph:Math.random()*6.28};
+    N.push(o);byId[n.id]=o;
+  });
+
+  // synaptic fibers: one LineSegments, vertex colors updated only on state change
+  links=d.links.filter(l=>byId[l.source]&&byId[l.target]);
+  const pos=new Float32Array(links.length*6);linkCol=new Float32Array(links.length*6);
+  links.forEach((l,i)=>{const a=byId[l.source].n,b=byId[l.target].n;pos.set([a.x,a.y,a.z,b.x,b.y,b.z],i*6)});
+  const lg=new THREE.BufferGeometry();
+  lg.setAttribute("position",new THREE.BufferAttribute(pos,3));
+  lg.setAttribute("color",new THREE.BufferAttribute(linkCol,3));
+  linkLines=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.7,depthWrite:false,blending:THREE.AdditiveBlending}));
+  group.add(linkLines);
+
+  $("leg").innerHTML=Object.keys(colors).map(k=>`<span class="dot" style="background:${colors[k]}"></span>${esc(k)}`).join("&nbsp;&nbsp; ");
+  refreshState();
+  addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+  bindPicking();
+  animate();
+}
+
+// ---- visual state: matches dim/light nodes, selection lights neighbors ----
+function refreshState(){
+  const hot=new Set(),nb=new Set();
+  if(matches)matches.forEach(m=>hot.add(m.id));
+  if(selected){hot.add(selected);(byId[selected].nbrs||[]).forEach(x=>nb.add(x))}
+  const filtered=!!(matches&&matches.length)||!!selected;
+  N.forEach(o=>{
+    const id=o.n.id,on=hot.has(id),near=nb.has(id);
+    o.sT=!filtered?o.base:on?o.base*1.9:near?o.base*1.2:o.base*.5;
+    o.aT=!filtered?1:on?1:near?.7:(matches&&matches.length===0&&!selected?.35:.14);
+    o.lb.dataset.t=!filtered||on||near?"1":"0";
+  });
+  links.forEach((l,i)=>{
+    const a=byId[l.source],b=byId[l.target];
+    const lit=(hot.has(l.source)&&hot.has(l.target))||(selected&&(l.source===selected||l.target===selected));
+    const k=!filtered?.32:lit?1:.06;
+    const c=lit?a.col.clone().lerp(b.col,.5):new THREE.Color(0x4a5a88);
+    for(let v=0;v<2;v++){linkCol[i*6+v*3]=c.r*k;linkCol[i*6+v*3+1]=c.g*k;linkCol[i*6+v*3+2]=c.b*k}
+  });
+  linkLines.geometry.attributes.color.needsUpdate=true;
+}
+
+const tmp=new V();
+function animate(t){
+  requestAnimationFrame(animate);
+  t=(t||0)/1000;
+  group.scale.setScalar(1+.012*Math.sin(t*1.3)); // idle breathing
+  if(tween){
+    tween.k=Math.min(1,tween.k+.035);const e=1-Math.pow(1-tween.k,3);
+    controls.target.lerpVectors(tween.t0,tween.t1,e);camera.position.lerpVectors(tween.c0,tween.c1,e);
+    if(tween.k>=1)tween=null;
+  }
+  controls.update();
+  const w=innerWidth,h=innerHeight;
+  N.forEach(o=>{
+    o.s+=(o.sT-o.s)*.12;o.a+=(o.aT-o.a)*.12;
+    const pulse=1+.07*Math.sin(t*2+o.ph);
+    o.sp.scale.setScalar(o.s*pulse);o.sp.material.opacity=o.a;
+    tmp.copy(o.sp.position);group.localToWorld(tmp);tmp.project(camera);
+    const vis=tmp.z<1;
+    o.lb.style.transform=`translate(${((tmp.x+1)/2*w+10)|0}px,${((1-tmp.y)/2*h-6)|0}px)`;
+    o.lb.style.opacity=vis&&o.lb.dataset.t!=="0"?(o.a>.5?1:.4):0;
+  });
+  renderer.render(scene,camera);
+}
+
+function focusOn(ids,dist){
+  if(!ids.length)return;
+  const c=new V();ids.forEach(i=>c.add(byId[i].sp.position));c.divideScalar(ids.length);
+  const dir=camera.position.clone().sub(controls.target).normalize();
+  const d=dist||(ids.length===1?4.2:Math.max(6.5,7+ids.length*.15));
+  tween={k:0,t0:controls.target.clone(),t1:c,c0:camera.position.clone(),c1:c.clone().add(dir.multiplyScalar(d))};
+  controls.autoRotate=false;
+}
+
+// ---- picking: screen-space nearest node (cheap, no raycast) ----
+function bindPicking(){
+  const el=renderer.domElement;let down=null;
+  el.addEventListener("pointerdown",e=>{down=[e.clientX,e.clientY];controls.autoRotate=false});
+  el.addEventListener("pointerup",e=>{
+    if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>5)return;
+    const id=pick(e.clientX,e.clientY);
+    if(id)selectNode(id);else if(selected)deselect();
+  });
+  el.addEventListener("pointermove",e=>{el.style.cursor=pick(e.clientX,e.clientY)?"pointer":"grab"});
+}
+function pick(x,y){
+  let best=null,bd=26;
+  N.forEach(o=>{
+    if(o.a<.2)return;
+    tmp.copy(o.sp.position);group.localToWorld(tmp);tmp.project(camera);
+    if(tmp.z>=1)return;
+    const d=Math.hypot((tmp.x+1)/2*innerWidth-x,(1-tmp.y)/2*innerHeight-y);
+    if(d<bd){bd=d;best=o.n.id}
+  });
+  return best;
+}
+
+// ---- search ----
+let timer=null,seq=0;
+$("q").addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(runSearch,110)});
+addEventListener("keydown",e=>{if(e.key==="Escape"){$("q").value="";runSearch();deselect();$("view").classList.add("off")}});
+function runSearch(){
+  const q=$("q").value.trim(),my=++seq;
+  if(!q){matches=null;$("lat").textContent="";$("res").classList.add("off");refreshState();return}
+  post("/api/search",{query:q}).then(r=>{
+    if(my!==seq)return;
+    matches=r.matches;$("lat").textContent=r.query_ms.toFixed(2)+" ms";
+    renderResults(r);refreshState();
+    if(r.matches.length)focusOn(r.matches.map(m=>m.id));
+  }).catch(()=>{$("lat").textContent="error"});
+}
+function renderResults(r){
+  const P=$("res"),top=r.matches.length?r.matches[0].score:1;
+  let h=`<span class="x" onclick="$('res').classList.add('off')">×</span><h2>Matches &amp; SSD Retrieval</h2>
+  <div class="mu">${r.matches.length} of ${r.total_nodes} nodes · lookup <b style="color:var(--ac)">${r.query_ms.toFixed(3)} ms</b> · SSD load ${r.load_ms.toFixed(1)} ms · ${r.candidates} candidates</div>`;
+  if(!r.matches.length)h+=`<p class="mu">No resonance above threshold for “${esc(r.query)}”.</p>`;
+  r.matches.forEach(m=>{
+    const c=colors[m.subject]||"#fff";
+    h+=`<div class="m" data-id="${esc(m.id)}"><b><span class="dot" style="background:${c}"></span>${esc(m.id.replace(/_/g," "))}</b>
+    <span class="mu" style="float:right">P = ${m.score.toFixed(4)}</span>
+    <div class="bar"><i style="width:${Math.max(3,m.score/top*100)}%;background:${c}"></i></div>
+    <div class="mu">${esc(m.subject)} · ${m.file_count} file${m.file_count===1?"":"s"}</div>`;
+    m.files.forEach(f=>{h+=`<div class="f" data-id="${esc(m.id)}" data-f="${esc(f.name)}">${esc(f.name)}${f.snippet?`<small>${esc(f.snippet)}</small>`:""}</div>`});
+    h+=`</div>`;
+  });
+  P.innerHTML=h;P.classList.remove("off");
+}
+$("res").addEventListener("click",e=>{
+  const f=e.target.closest(".f");
+  if(f){e.stopPropagation();readFile(f.dataset.id,f.dataset.f);return}
+  const m=e.target.closest(".m");if(m)selectNode(m.dataset.id);
+});
+
+// ---- node inspector ----
+function selectNode(id){
+  selected=id;refreshState();focusOn([id]);
+  const D=$("drawer");D.innerHTML=`<span class="x" onclick="deselect()">×</span><h2>${esc(id.replace(/_/g," "))}</h2><div class="mu">loading…</div>`;
+  D.classList.remove("off");
+  api("/api/node/"+encodeURIComponent(id)).then(d=>{
+    if(selected!==id)return;
+    byId[id].nbrs=d.neighbors.map(x=>x.id);refreshState();
+    const c=colors[d.subject]||"#fff";
+    let h=`<span class="x" onclick="deselect()">×</span><h2>${esc(id.replace(/_/g," "))}</h2>
+    <div class="mu"><span class="dot" style="background:${c}"></span>${esc(d.subject)}</div>
+    <h3>Connected nodes (${d.neighbors.length})</h3>`+
+    d.neighbors.map(n=>`<span class="chip" data-nb="${esc(n.id)}"><span class="dot" style="background:${colors[n.subject]||"#fff"}"></span>${esc(n.id.replace(/_/g," "))}</span>`).join("")+
+    `<h3>SSD folder</h3><div class="path">${esc(d.ssd_path)}</div>
+    <button id="openBtn">Open SSD Folder</button><div id="openMsg" class="mu" style="margin-top:6px"></div>
+    <h3>Files (${d.file_count})</h3>`+
+    (d.files.length?d.files.map(f=>`<div class="f" data-f="${esc(f.name)}">${esc(f.name)} <span class="mu">· ${fmt(f.size)}</span>${f.preview?`<small>${esc(f.preview)}</small>`:""}</div>`).join(""):`<div class="mu">Folder is empty.</div>`);
+    D.innerHTML=h;
+    $("openBtn").onclick=()=>post("/api/node/"+encodeURIComponent(id)+"/open").then(r=>{$("openMsg").textContent="Opened "+r.path}).catch(()=>{$("openMsg").textContent="Could not open the folder on this OS."});
+  }).catch(()=>{D.innerHTML+=`<div class="mu">Failed to load node.</div>`});
+}
+$("drawer").addEventListener("click",e=>{
+  const c=e.target.closest(".chip");if(c){selectNode(c.dataset.nb);return}
+  const f=e.target.closest(".f");if(f&&selected)readFile(selected,f.dataset.f);
+});
+function deselect(){selected=null;$("drawer").classList.add("off");refreshState()}
+function fmt(b){return b<1024?b+" B":(b/1024).toFixed(1)+" KB"}
+
+function readFile(id,name){
+  const V_=$("view");V_.classList.remove("off");V_.innerHTML=`<span class="x" onclick="$('view').classList.add('off')">×</span><b>${esc(name)}</b><pre>loading…</pre>`;
+  api("/api/node/"+encodeURIComponent(id)+"/file?name="+encodeURIComponent(name)).then(d=>{
+    V_.innerHTML=`<span class="x" onclick="$('view').classList.add('off')">×</span><b>${esc(d.name)}</b> <span class="mu">· ${fmt(d.size)}${d.truncated?" · truncated":""}</span><pre>${d.content==null?"(binary file — preview unavailable)":esc(d.content)}</pre>`;
+  }).catch(()=>{V_.querySelector("pre").textContent="Could not read file."});
+}
+
+api("/api/brain").then(init).catch(e=>{document.body.insertAdjacentHTML("beforeend",`<p style="padding:40px">Failed to load /api/brain (${esc(e.message)})</p>`)});
+api("/api/stats").then(s=>{if(s.rss_mb!=null)$("hud").textContent=`backend RAM ${s.rss_mb} MB · ${s.nodes} nodes · ${s.links} synapses`}).catch(()=>{});
+</script>
+</body>
+</html>

@@ -1,5 +1,3 @@
-Writing
-
 # ResonanceIndex3D — Edge-Native Graph-Aware Sparse Memory Engine
 
 \!Python \!NumPy \!Memory \!Latency

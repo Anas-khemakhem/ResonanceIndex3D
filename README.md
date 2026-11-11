@@ -61,7 +61,7 @@ Evaluated in isolated fresh processes on an **Intel i7-12th Gen U (CPU only, no 
 
 ### Honest Engineering Limitations
 
-- **Not****$\mathcal{O}(1)$****Asymptotic Space:** Index memory scales linearly at $\mathcal{O}(N)$ (\~0.4 KB/node). Only per-query compute is bounded via top-$K$ posting truncation (`MAX_POSTINGS`).
+- **Not**$\mathcal{O}(1)$**Asymptotic Space:** Index memory scales linearly at $\mathcal{O}(N)$ (\~0.4 KB/node). Only per-query compute is bounded via top-$K$ posting truncation (`MAX_POSTINGS`).
 - **Recall vs. Cap Trade-off:** On ultra-frequent atoms exceeding `MAX_POSTINGS = 256`, early termination trades a small fraction of recall (\~1–5%) for deterministic sub-millisecond latency.
 - **Not a Replacement for Full-Text Search Engines:** For pure keyword search over massive prose corpora without graph topology, established engines like **SQLite FTS5** or **Apache Lucene (Block-Max WAND)** remain superior.
 

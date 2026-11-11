@@ -1,9 +1,9 @@
 # ResonanceIndex3D — Edge-Native Graph-Aware Sparse Memory Engine
 
-[![Python 3.10+](https://shields.io)](https://python.org)
-[![NumPy](https://shields.io)](https://numpy.org)
-[![Memory Footprint](https://shields.io)]()
-[![Latency](https://shields.io)]()
+![Python](https://shields.io)
+![NumPy](https://shields.io)
+![Memory](https://shields.io)
+![Latency](https://shields.io)
 
 **ResonanceIndex3D** is an ultra-lightweight, zero-GPU semantic & topological retrieval engine designed for resource-constrained edge devices. Built originally as the long-term associative memory core for **Jarvis** (a local cyber-physical assistant running alongside quantized LLMs on a CPU-only laptop), it unifies **lexical fuzzy matching** and **3D knowledge-graph neighborhood proximity** into a single sparse vector pass—achieving **sub-millisecond bounded latency** with a **~0.4 KB/node** RAM footprint.
 
@@ -30,12 +30,19 @@ When running local LLMs (e.g., Qwen, DeepSeek via Ollama) and computer vision pi
 ## Mathematical Formulation
 
 1. **Feature Encoding & Neighborhood Superposition (Startup):**
-   Each node $i$ is represented as a sparse TF-IDF weighted atom vector $\mathbf{v}_i$. To encode graph topology without runtime traversal, each node state $\lvert\Psi_i\rangle$ is constructed as a normalized superposition of its own features and its direct neighbors $\mathcal{N}(i)$:
-   $$\lvert\Psi_i\rangle = \frac{\mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)} \mathbf{v}_j^{\text{(tokens)}}}{\left\lVert \mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)} \mathbf{v}_j^{\text{(tokens)}} \right\rVert_2}$$
+   Each node $i$ is represented as a sparse TF-IDF weighted atom vector $\mathbf{v}_i$. To encode graph topology without runtime traversal, each node state $|\Psi_i\rangle$ is constructed as a normalized superposition of its own features and its direct neighbors $\mathcal{N}(i)$:
+
+$$
+
+|\Psi_i\rangle = \frac{\mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)} \mathbf{v}_j^{(\text{tokens})}}{\|\mathbf{v}_i + \alpha \sum_{j \in \mathcal{N}(i)} \mathbf{v}_j^{(\text{tokens})}\|_2}
+$$
 
 2. **Born-Rule Relevance Scoring (Query Time):**
-   Given a normalized query wave $\lvert q\rangle$, candidate postings are accumulated up to `MAX_POSTINGS` per atom, and nodes are ranked via squared amplitude overlap:
-   $$P_i = \left\lvert \langle q \vert \Psi_i \rangle \right\rvert^2$$
+   Given a normalized query wave $|q\rangle$, candidate postings are accumulated up to `MAX_POSTINGS` per atom, and nodes are ranked via squared amplitude overlap:
+
+$$
+P_i = |\langle q | \Psi_i \rangle|^2
+$$
 
 ---
 
@@ -62,7 +69,7 @@ The repository includes a lightweight **Flask + Three.js** visualizer that rende
 
 ```bash
 # 1. Clone the repository
-git clone [https://github.com](https://github.com/Anas-khemakhem/ResonanceIndex3D)
+git clone https://github.com
 cd ResonanceIndex3D
 
 # 2. Install minimal dependencies (Flask, NumPy, NetworkX)
